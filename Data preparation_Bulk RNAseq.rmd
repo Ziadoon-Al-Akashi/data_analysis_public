@@ -1,0 +1,83 @@
+Open the all the raw counts data
+
+```{r}
+rawdata <- read.csv("raw_data.csv")
+#read the sample metadata
+info <- read.csv("info.csv")
+```
+
+Data arrangement
+
+```{r}
+#select out the columns that include the data from the samples you want to analyze
+data <- rawdata[,-1]
+#save name of rows to names of gene list
+rownames(data) <- make.names(rawdata[,1], unique = TRUE)
+```
+
+DESeq part
+
+```{r}
+#prepare data for DESeq2
+dds <- DESeqDataSetFromMatrix(data,
+                              colData = info,
+                              design = ~Type)
+
+#filter out low counts genes
+keep <- rowSums(counts(dds)) >= 10
+
+#apply the "keep" condition on the dds
+dds <- dds[keep,]
+
+#main DESeq
+ddsDE <- DESeq(dds)
+
+#normalize the read counts
+normCounts <- counts(ddsDE, normalized = T)
+
+#save the csv file of the normalized data
+#write.csv(normCounts, "normalized_data.csv")
+
+```
+
+```{r}
+#DESeq results
+res1 <- results(ddsDE, contrast=c("Type","condition1","control"), alpha = 0.05)
+res2 <- results(ddsDE, contrast=c("Type","condition2","control"), alpha = 0.05)
+res3 <- results(ddsDE, contrast=c("Type","condition1","condition2"), alpha = 0.05)
+```
+
+reorder the results data and save the csv files
+
+```{r}
+#reorder res
+resOrdered1 <- res1[order(res1$padj),]
+resOrdered2 <- res2[order(res2$padj),]
+resOrdered3 <- res3[order(res3$padj),]
+
+write.csv(resOrdered1, "deseq_res1_condition1_vs_control.csv")
+write.csv(resOrdered2, "deseq_res1_condition2_vs_control.csv")
+write.csv(resOrdered3, "deseq_res1_condition1_vs_condition2.csv")
+
+```
+
+Data plotting Data preparation
+
+```{r}
+
+deSeqRes1 <- read.csv("deseq_res1_condition1_vs_control.csv")
+deSeqRes2 <- read.csv("deseq_res1_condition2_vs_control.csv")
+deSeqRes3 <- read.csv("deseq_res1_condition1_vs_condition2.csv")
+
+#adding a col to resOrdered calling it sig, and conditioning it to "yes" if padj is 
+#less than 0.05, otherwise "no"
+deSeqRes1$sig <- ifelse(deSeqRes1$padj <= 0.05, "yes", "no")
+deSeqRes2$sig <- ifelse(deSeqRes2$padj <= 0.05, "yes", "no")
+deSeqRes3$sig <- ifelse(deSeqRes3$padj <= 0.05, "yes", "no")
+
+#omitting the "NA"
+deSeqRes1 <- na.omit(deSeqRes1)
+deSeqRes2 <- na.omit(deSeqRes2)
+deSeqRes3 <- na.omit(deSeqRes3)
+
+```
