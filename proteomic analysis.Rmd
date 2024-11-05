@@ -1,0 +1,283 @@
+
+```{r}
+data1 <- read.csv("RUN1.csv")
+data2 <- read.csv("RUN2.csv")
+```
+
+```{r}
+subdata1 <- data1[,c(2, 8:11)]
+subdata2 <- data2[,c(2,8:9)]
+# Merge dataframes by the 'Genes' column
+sub_all <- merge(subdata1, subdata2, by = "Genes", all = TRUE)
+```
+
+```{r}
+desired_order <- c(1, 2, 6, 7, 3, 4, 5)
+data_all_order <- sub_all[ , desired_order]
+datax <-  data_all_order[,c(2:7)]
+rownames(datax) <- make.names(data_all_order$Genes, unique = TRUE)
+
+```
+
+```{r}
+info <- read.csv("info.csv")
+colnames(datax) <- info$sample.name
+write.csv(datax, "clean_data.csv")
+```
+
+
+filtering on the condition in which the protein is present in at least 1 or more sample of the EV(control)
+and 2 or more of the iEV(condition)
+
+```{r}
+# Define column groups
+condition_cols <- grep("^iEV_", colnames(datax), value = TRUE)
+control_cols <- grep("^EV_", colnames(datax), value = TRUE)
+
+# Count non-missing values in each group
+count_non_missing <- function(x) {
+  c(condition = sum(!is.na(x[condition_cols])),
+    control = sum(!is.na(x[control_cols])))
+}
+
+# Apply the function to each row
+counts <- t(apply(datax, 1, count_non_missing))
+
+# Filter rows with at least 3 non-missing values in either group
+filtered_datax <- datax[which(counts[, "condition"] >= 2 | counts[, "control"] >= 1), ]
+
+
+```
+
+```{r}
+write.csv(filtered_datax, "clean_filtered(with NA)_data.csv")
+```
+
+
+```{r}
+cor_data <- cor(filtered_datax, use = "pairwise.complete.obs")
+color_palette <- colorRampPalette(c("blue", "white", "red"))(100)
+
+Heatmap(cor_data,
+                 cluster_rows = F,
+                 heatmap_legend_param = list(at = c(-1, 0, 1), title = NULL),
+                 cluster_columns = F,
+                 col = colorRamp2(c(-1, 0, 1), c("blue3", "white", "red3")), 
+                 show_row_names = T, 
+                 show_column_names = F, 
+                 row_dend_side = "right", 
+                 show_column_dend = F, 
+                 column_dend_side = "bottom",
+                 column_dend_height = unit(5, "mm"),
+                 row_dend_width = unit(5, "mm"),
+                 column_title = "Pairwise correlation between samples",
+                 column_title_gp = gpar(fontsize = 16)
+                 )
+```
+
+
+```{r}
+# Add 1 constant to avoid log(0)
+log2_data <- log2(filtered_datax + 1)
+# Z-score normalization
+z_score_data <- t(apply(log2_data, 1, function(x) (x - mean(x, na.rm = TRUE)) / sd(x, na.rm = TRUE)))
+# Convert back to a dataframe
+z_score_data <- as.data.frame(z_score_data)
+colnames(z_score_data) <- colnames(log2_data)
+rownames(z_score_data) <- rownames(log2_data)
+
+```
+
+
+```{r}
+# Melt the data for ggplot2
+library(reshape2)
+library(ggplot2)
+
+melted_data <- melt(log2_data)
+
+# Create boxplot
+ggplot(melted_data, aes(x = variable, y = value, fill = variable)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Boxplot of Z-score Normalized Data",
+       x = "Sample",
+       y = "Z-score Normalized Expression") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
+
+```
+
+
+
+```{r}
+# Remove rows with any NA values
+z_score_data <- na.omit(z_score_data)
+log2_data <- na.omit(log2_data)
+```
+
+```{r}
+
+
+annot = data.frame(line = c(rep("iEV", 3), rep("EV", 3)),
+                   row.names = colnames(info$sample.name))
+
+png(file="heatmap_iEV-EV(z-score).png", width=4,height=4.5,units="in",res=1200)
+# Create the heatmap with row annotations for grouping
+hm <- Heatmap(
+  z_score_data,
+  name = "z-score",
+  heatmap_legend_param = list(at = c(-3, 0, 3), title_position = "lefttop-rot"),
+  col = viridis(100),
+  cluster_rows = T,
+  cluster_columns = T,
+  column_dend_height = unit(1, "cm"),
+  row_dend_width = unit(1, "cm"),
+  border = TRUE,
+  column_split = annot$line,
+  row_km = 2,
+  show_column_names = T,
+  show_row_names = TRUE,
+  row_names_gp = gpar(fontsize = 10),
+  show_row_dend = T,
+  column_names_gp = gpar(fontsize = 8),
+  column_title_gp = gpar(fontsize = 14),
+  show_column_dend = TRUE,
+  show_heatmap_legend = TRUE,
+  row_title_rot = 0,
+  row_title = NULL,
+  row_title_gp = gpar(fontsize = 14),
+  row_gap = unit(2, "mm"),
+  column_gap = unit(2, "mm"),
+  cluster_row_slices = T,
+  cluster_column_slices = F,
+)
+
+
+draw(hm, padding = unit(c(2, 2, 2, 2), "mm"), merge_legend = TRUE)
+dev.off()
+
+```
+
+
+
+```{r}
+# Calculate means and standard deviations for conditions
+condition_means <- colMeans(z_score_data[, grep("^iEV_", colnames(z_score_data))], na.rm = TRUE)
+control_means <- colMeans(z_score_data[, grep("^EV_", colnames(z_score_data))], na.rm = TRUE)
+
+condition_sd <- apply(z_score_data[, grep("^iEV_", colnames(z_score_data))], 2, sd, na.rm = TRUE)
+control_sd <- apply(z_score_data[, grep("^EV_", colnames(z_score_data))], 2, sd, na.rm = TRUE)
+
+# Combine data into a data frame for plotting
+plot_data <- data.frame(
+  Sample = c("iEV_1", "iEV_2", "iEV_3", "EV_1", "EV_2", "EV_3"),
+  Mean = c(condition_means, control_means),
+  SD = c(condition_sd, control_sd)
+)
+
+# Bar plot with error bars
+ggplot(plot_data, aes(x = Sample, y = Mean, fill = Sample)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(ymin = Mean - SD, ymax = Mean + SD), width = 0.2) +
+  theme_minimal() +
+  labs(title = "Bar Plot of Normalized Data with Standard Deviation",
+       x = "Sample",
+       y = "Z-score Normalized Expression")
+
+```
+
+```{r}
+library(limma)
+
+
+# Define the factor levels correctly
+condition_factor <- factor(c(rep("iEV", 3), rep("EV", 3)), levels = c("iEV", "EV"))
+
+# Define the design matrix
+design <- model.matrix(~ 0 + condition_factor)
+colnames(design) <- levels(condition_factor)
+
+# Fit the linear model
+fit <- lmFit(z_score_data, design)
+
+# Make contrasts
+contrast.matrix <- makeContrasts(iEV - EV, levels = design)
+
+# Fit contrasts
+fit2 <- contrasts.fit(fit, contrast.matrix)
+fit2 <- eBayes(fit2)
+
+
+```
+
+
+
+```{r}
+library(ggplot2)
+
+# Extract all genes with adj.P.Val <= 0.05
+top_genes <- topTable(fit2, number = Inf)
+top_genes <- subset(top_genes, adj.P.Val <= 0.05)
+
+# Ensure Gene column is available for plotting
+top_genes$Gene <- rownames(top_genes)
+
+# Sort genes by logFC
+top_genes <- top_genes[order(top_genes$logFC, decreasing = TRUE), ]
+
+# Select top 5 upregulated genes (highest positive logFC) and top 5 downregulated genes (lowest negative logFC)
+top_5_up <- top_genes[1:5, ]
+top_5_down <- top_genes[(nrow(top_genes) - 4):nrow(top_genes), ]
+
+# Combine upregulated and downregulated genes
+top_genes_plot <- rbind(top_5_up, top_5_down)
+
+# Enhanced bar plot with customizations
+ggplot(top_genes, aes(x = reorder(Gene, logFC), y = logFC)) +
+  geom_bar(stat = "identity", fill = "grey55", color = "black", size = 0.5) +  # Use a single dark color
+  coord_flip() +  # Flip coordinates for better readability
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(size = 12, face = "bold", color = "black"),
+    axis.text.y = element_text(size = 12, face = "bold", color = "black"),
+    axis.title.x = element_text(size = 14, face = "bold", color = "black"),
+    axis.title.y = element_text(size = 14, face = "bold", color = "black"),
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5, color = "black"),
+    legend.position = "none",  # Remove the legend
+    panel.grid.major = element_blank(),  # Remove major grid lines
+    panel.grid.minor = element_blank(),  # Remove minor grid lines
+    panel.background = element_rect(fill = "transparent", color = NA),  # Transparent background
+    axis.line = element_blank(),  # Remove default axis lines
+    axis.line.x = element_line(color = "black", size = 0.5)  # Add line to bottom of x-axis
+  ) +
+  labs(title = "Top 10 Differentially Expressed Genes",
+       x = NULL,
+       y = "Log-Fold Change") +
+  scale_y_continuous(breaks = c(-2, 0, 2), limits = c(-3, 3))
+
+# Save the plot with customizations and a transparent background
+ggsave("top_genes_plot.png", width = 10, height = 8, dpi = 600, units = "in", bg = "transparent")
+
+write.csv(top_genes, "sigproteins.csv")
+
+```
+
+
+
+
+
+```{r}
+# Remove rows with any missing values
+filtered_datax_filtered <- filtered_datax_filtered[complete.cases(filtered_datax_filtered), ]
+
+write.csv(filtered_datax_filtered, "clean_filtered(without NA)_data.csv")
+
+```
+
+
+
+
+
+
+
+
