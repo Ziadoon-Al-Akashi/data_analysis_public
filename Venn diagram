@@ -1,0 +1,39 @@
+gene_list1 <- list("Early vs Late" = set1,
+                  "Early vs Mid" = set2,
+                   "Late vs Mid" = set3)
+
+venn1 <- Venn(gene_list1)
+data1 <- process_data(venn1)
+
+items <- venn_region(data1) %>%
+  rowwise() %>%
+  mutate(
+    text = yulab.utils::str_wrap(paste0(.data$item, collapse = " "), width = 40)
+  ) %>%
+  sf::st_as_sf()
+
+label_coord = sf::st_centroid(items$geometry) %>% sf::st_coordinates()
+
+p <- ggplot(items) +
+  geom_sf(aes(fill = count)) +
+  geom_sf_text(aes(label = name),
+               data = data1@setLabel,
+               inherit.aes = FALSE,
+               size = 8) +
+  geom_text(
+    aes(label = count, text = text),
+    x = label_coord[, 1],
+    y = label_coord[, 2],
+    show.legend = FALSE,
+    size = 12
+  ) +
+  scale_x_continuous(expand = expansion(mult = .4))+
+  theme_void() +
+  scale_fill_distiller(palette = "Greens", direction = 1)+
+  theme(legend.position = c(0.85, 0.25),
+        legend.text = element_text(size = 16),
+        legend.title = element_text(size = 20)
+        )
+
+
+print(p)
