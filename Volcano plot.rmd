@@ -1,0 +1,29 @@
+#setting the threshold
+pval_threshold <- 0.05
+logfc_threshold <- 1.5
+
+
+## enhanced Volcano
+
+EnhancedVolcano(deSeqRes1,
+              lab = NA,
+                x = 'log2FoldChange',
+                y = 'padj',
+                xlab = NULL,
+                ylab = NULL,
+                ylim = c(0, 30),
+                xlim = c(-15, 15),
+                pCutoff = 0.05,
+                FCcutoff = 1.5,
+                col=c('black', 'black', 'black', 'red3'),
+                pointSize = 2.0,
+                #labSize = 4,
+                axisLabSize = 12,
+                colAlpha = 0.4,
+                legendPosition = "none",
+                subtitle = "Early vs. Late",
+                subtitleLabSize = 12,
+                title = NULL,
+                caption = NULL,
+                gridlines.major = F,
+                gridlines.minor = F,)
