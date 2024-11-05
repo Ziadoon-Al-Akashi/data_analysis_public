@@ -1,0 +1,84 @@
+normCounts <- read.csv("normalized_data.csv", row.names = 1)   
+info <- read.csv("info.csv")
+colnames(normCounts) <- info$PN
+
+# Define the groups and the genes in each group
+groups <- list(
+  "Neural stem cells" = c('PAX6', 'SOX2', 'SOX1', 'NES', 'DLL1', 'HES5', 'NOTCH1', 'FABP7'),
+  "Differentiated" = c("L1CAM", "MAP2", "TUBB3", "NEFL"),
+  "Forebrain" = c('ISL1', 'OTX2', "SFRP1"),
+   "Pluripotency" = c('NANOG', 'POU5F1', "LIN28A" ),
+  "Midbrain" = c('TH', 'LMX1B', "CLSTN2"),
+  "Hindbrain" = c('GBX2', 'PHOX2B', 'HOXB4', 'HOXB2', 'HOXA2', 'PAX3'),
+  "Spinal cord" = c('CADPS2', 'HOXB9', 'HOXB8', 'HOXB7', 'HOXB6')
+)
+
+# Extract the gene names from the groups
+group_genes <- unlist(groups)
+
+# Subset the data frame to select rows with matching gene names
+subset_counts <- normCounts[group_genes, , drop = FALSE]
+mat <- as.matrix(subset_counts)
+mat_scaled <- t(scale(t(mat)))
+
+# Create a data frame with row annotations for grouping
+row_annotation_df <- data.frame(
+  Group = factor(rep(names(groups), sapply(groups, length)))
+)
+
+
+annot = data.frame(line = c(rep("Early",8), rep("Mid", 4), rep("Late", 6), "Early_Diff", "Late_Diff", rep("Control", 3)),
+                   row.names = colnames(info$code))
+
+anno.colors <- list(line = c("Control" = "darkred", "Early" = "gold", "Mid" = "darkcyan", 
+                             "Late" = "darkgreen", "Early_Diff" = "orange3", "Late_Diff" = "green3"))
+
+
+ha = HeatmapAnnotation(df = annot,name = "Annotation", col = anno.colors, show_annotation_name = F,
+                         show_legend = T,
+                       annotation_legend_param = list(line = list(title = NULL, labels_gp = gpar(fontsize = 12),
+                                                                  labels = c("Control","Early","Mid","Late", "Early_Diff", "Late_Diff"), 
+                                                                  at = c("Control","Early","Mid","Late", "Early_Diff", "Late_Diff"))))
+
+
+split <- factor(row_annotation_df$Group, levels=c("Pluripotency","Neural stem cells","Differentiated", "Forebrain","Midbrain","Hindbrain","Spinal cord" ))
+split2 <- factor(annot$line, levels=c("Control","Early","Mid","Late"))
+
+
+
+# Create the heatmap with row annotations for grouping
+hm <- Heatmap(
+  mat_scaled,
+  name = "z-score",
+  top_annotation = ha,
+  heatmap_legend_param = list(at = c(-5, 0, 5), title_position = "lefttop-rot"),
+  col = rocket(100),
+  cluster_rows = T,
+  cluster_columns = F,
+  column_dend_height = unit(1, "cm"),
+  row_dend_width = unit(1, "cm"),
+  border = TRUE,
+  show_column_names = T,
+  show_row_names = TRUE,
+  row_names_gp = gpar(fontsize = 14),
+  show_row_dend = T,
+  column_names_gp = gpar(fontsize = 12),
+  column_title_gp = gpar(fontsize = 12),
+  show_column_dend = TRUE,
+  show_heatmap_legend = TRUE,
+  column_title = NULL,
+  row_title_rot = 0,
+  column_title_rot = 0,
+  row_title_gp = gpar(fontsize = 16),
+  row_gap = unit(2, "mm"),
+  column_gap = unit(2, "mm"),
+  row_split = split,
+  column_split = split2,
+  cluster_row_slices = F, 
+  cluster_column_slices = F,
+)
+
+
+png(file = "heatmap.png", width = 9, height = 8, units = "in")
+draw(hm, padding = unit(c(2, 2, 2, 2), "mm"), merge_legend = TRUE)
+dev.off()
