@@ -1,13 +1,11 @@
-# Data Analysis Toolkit
+# Data Analysis 
 
-This repository contains a collection of R Markdown files for performing various data analysis tasks, primarily in the fields of bulk RNA sequencing and proteomics.
+This repository contains a collection of R Markdown files for performing various data analysis tasks, primarily bulk RNA sequencing and proteomics.
 
 ## Table of Contents
 
 - [Files](#files)
 - [Installation](#installation)
-- [Usage](#usage)
-- [Description of Analysis Files](#description-of-analysis-files)
 
 
 ## Files
