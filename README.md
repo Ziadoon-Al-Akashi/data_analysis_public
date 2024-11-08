@@ -8,8 +8,7 @@ This repository contains a collection of R Markdown files for performing various
 - [Installation](#installation)
 - [Usage](#usage)
 - [Description of Analysis Files](#description-of-analysis-files)
-- [Contributing](#contributing)
-- [License](#license)
+
 
 ## Files
 
